@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Field Record</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Field Record">
+<meta name="theme-color" content="#0e5a3a">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+
+<style>
+:root{--bg:#f6f4ee;--card:#fff;--ink:#17231d;--mute:#5d6b63;--line:#d9d6ca;--g:#0e5a3a;--gt:#fff;--gold:#e8b923;--err:#b3261e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101814;--card:#18231d;--ink:#eef2ee;--mute:#9aa9a0;--line:#2b3a32;--g:#3fb37f;--gt:#06140d;--err:#ff8a80}}
+:root[data-theme="dark"]{--bg:#101814;--card:#18231d;--ink:#eef2ee;--mute:#9aa9a0;--line:#2b3a32;--g:#3fb37f;--gt:#06140d;--err:#ff8a80}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 "Public Sans",system-ui,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:8px 0 2px}
+h2{font-size:1.05rem;margin:0 0 10px}
+.sub{color:var(--mute);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+label{display:block;font-size:.85rem;color:var(--mute);margin:10px 0 4px}
+input,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+textarea{min-height:64px;resize:vertical}
+button,.btn{font:inherit;font-weight:600;border:0;border-radius:10px;padding:12px 14px;background:var(--g);color:var(--gt);cursor:pointer;display:inline-block;text-align:center;text-decoration:none}
+button.alt,.btn.alt{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:focus-visible,.btn:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1 1 140px}
+.fix{border-left:5px solid var(--gold);padding-left:12px}
+.big{font-size:1.25rem;font-weight:700;font-variant-numeric:tabular-nums}
+.mute{color:var(--mute);font-size:.9rem}
+.err{color:var(--err)}
+img.p{width:100%;max-height:260px;object-fit:cover;border-radius:8px;margin-top:10px}
+.rec{border-top:1px solid var(--line);padding:12px 0}.rec:first-child{border-top:0}
+.rec img{width:64px;height:64px;object-fit:cover;border-radius:6px;float:right;margin-left:10px}
+details summary{cursor:pointer;font-weight:600}
+</style>
+</head>
+<body>
+<main>
+<h1>Field Record</h1>
+<p class="sub">Capture where you are, when, with a photo, and send it to your supervisor.</p>
+
+<section class="card fix">
+  <div class="mute">Current time</div>
+  <div class="big" id="clock">--</div>
+  <div class="mute" id="where">Location not captured yet</div>
+</section>
+
+<section class="card">
+  <h2>New record</h2>
+  <div class="row">
+    <button id="gps">Get my location</button>
+  </div>
+  <p class="mute err" id="gpsErr" role="alert"></p>
+  <label for="note">Note (optional)</label>
+  <textarea id="note" placeholder="Where you are and what you are doing"></textarea>
+  <div class="row" style="margin-top:10px">
+    <label class="btn alt" style="margin:0;color:var(--ink)">Take photo<input id="cam" type="file" accept="image/*" capture="environment" hidden></label>
+    <label class="btn alt" style="margin:0;color:var(--ink)">Upload image<input id="up" type="file" accept="image/*" hidden></label>
+  </div>
+  <img id="prev" class="p" alt="Photo preview" hidden>
+  <div class="row" style="margin-top:12px">
+    <button id="save" disabled>Save record</button>
+  </div>
+</section>
+
+<section class="card" id="sendCard" hidden>
+  <h2>Notify supervisor</h2>
+  <div class="row">
+    <button id="wa">WhatsApp</button>
+    <button id="sms" class="alt">SMS</button>
+    <button id="mail" class="alt">Email</button>
+    <button id="share" class="alt">Share with photo</button>
+  </div>
+  <p class="mute">Your phone opens the app with the message ready. Press send there.</p>
+</section>
+
+<details class="card" id="setup" open>
+  <summary>Supervisor details</summary>
+  <label for="sn">Name</label><input id="sn" autocomplete="off">
+  <label for="sp">Phone with country code, e.g. 233241234567</label><input id="sp" inputmode="tel">
+  <label for="se">Email</label><input id="se" type="email">
+  <label for="me">Your name</label><input id="me">
+  <div class="row" style="margin-top:12px"><button id="ss">Save details</button></div>
+</details>
+
+<section class="card">
+  <h2>Saved records</h2>
+  <div id="list" class="mute">No records yet.</div>
+  <div class="row" style="margin-top:10px"><button id="clr" class="alt">Clear all</button></div>
+</section>
+</main>
+
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var cur=null, photo=null, cfg={}, recs=[];
+function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
+cfg=ld('fr_cfg',{}); recs=ld('fr_recs',[]);
+['sn','sp','se','me'].forEach(function(k){$(k).value=cfg[k]||''});
+if(cfg.sp||cfg.se)$('setup').open=false;
+
+function fmt(d){return d.toLocaleString([], {weekday:'short',year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}
+setInterval(function(){$('clock').textContent=fmt(new Date())},1000);$('clock').textContent=fmt(new Date());
+
+$('ss').onclick=function(){['sn','sp','se','me'].forEach(function(k){cfg[k]=$(k).value.trim()});cfg.sp=(cfg.sp||'').replace(/\D/g,'');sv('fr_cfg',cfg);$('setup').open=false};
+
+$('gps').onclick=function(){
+  $('gpsErr').textContent='';
+  if(!navigator.geolocation){$('gpsErr').textContent='This browser cannot read location. Open the link in Chrome or Safari.';return}
+  $('gps').disabled=true;$('gps').textContent='Locating...';
+  function ok(p){
+    var t=new Date();
+    cur={lat:p.coords.latitude,lon:p.coords.longitude,acc:Math.round(p.coords.accuracy),time:t.toISOString(),local:fmt(t)};
+    $('where').textContent=cur.lat.toFixed(6)+', '+cur.lon.toFixed(6)+' (accuracy about '+cur.acc+' m)';
+    $('gps').disabled=false;$('gps').textContent='Refresh location';$('save').disabled=false;
+  }
+  function fail(e){
+    $('gps').disabled=false;$('gps').textContent='Get my location';
+    $('gpsErr').textContent=e.code===1?'Location is blocked (code 1). Allow location for this site and for your browser in device settings, then reload. If this page is inside another app, open the link in Chrome or Safari.':'Could not get a location fix (code '+e.code+'). Turn on Wi-Fi and device location, then try again.';
+  }
+  navigator.geolocation.getCurrentPosition(ok,function(e){
+    if(e.code===1){fail(e);return}
+    $('gps').textContent='Trying network location...';
+    navigator.geolocation.getCurrentPosition(ok,fail,{enableHighAccuracy:false,timeout:30000,maximumAge:60000});
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+};
+
+function pick(f){
+  if(!f)return;
+  var r=new FileReader();
+  r.onload=function(){var im=new Image();im.onload=function(){
+    var m=900,s=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');
+    c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    photo=c.toDataURL('image/jpeg',0.7);$('prev').src=photo;$('prev').hidden=false;
+  };im.src=r.result};
+  r.readAsDataURL(f);
+}
+$('cam').onchange=function(){pick(this.files[0])};
+$('up').onchange=function(){pick(this.files[0])};
+
+function msg(r){
+  var n=r.note?'\nNote: '+r.note:'';
+  return 'Field record'+(cfg.me?' from '+cfg.me:'')+'\nDate and time: '+r.local+'\nLocation: '+r.lat.toFixed(6)+', '+r.lon.toFixed(6)+' (about '+r.acc+' m)\nMap: https://maps.google.com/?q='+r.lat+','+r.lon+n;
+}
+var last=null;
+function show(r){last=r;$('sendCard').hidden=false;$('sendCard').scrollIntoView({behavior:'smooth'})}
+
+$('save').onclick=function(){
+  if(!cur)return;
+  var r={id:Date.now(),lat:cur.lat,lon:cur.lon,acc:cur.acc,time:cur.time,local:cur.local,note:$('note').value.trim(),photo:photo};
+  recs.unshift(r);
+  if(!sv('fr_recs',recs)){r.photo=null;if(!sv('fr_recs',recs)){recs.shift()}}
+  $('note').value='';photo=null;$('prev').hidden=true;$('save').disabled=true;
+  render();show(r);
+};
+
+function need(k,t){if(!cfg[k]){$('setup').open=true;$('setup').scrollIntoView();alert('Add your supervisor\'s '+t+' first.');return false}return true}
+$('wa').onclick=function(){if(last&&need('sp','phone number'))window.open('https://wa.me/'+cfg.sp+'?text='+encodeURIComponent(msg(last)),'_blank')};
+$('sms').onclick=function(){if(last&&need('sp','phone number'))location.href='sms:+'+cfg.sp+'?body='+encodeURIComponent(msg(last))};
+$('mail').onclick=function(){if(last&&need('se','email'))location.href='mailto:'+cfg.se+'?subject='+encodeURIComponent('Field record '+last.local)+'&body='+encodeURIComponent(msg(last))};
+$('share').onclick=function(){
+  if(!last)return;
+  var d={title:'Field record',text:msg(last)};
+  if(last.photo){try{var b=atob(last.photo.split(',')[1]),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);var f=new File([a],'record.jpg',{type:'image/jpeg'});if(navigator.canShare&&navigator.canShare({files:[f]}))d.files=[f]}catch(e){}}
+  if(navigator.share)navigator.share(d).catch(function(){});else alert('Sharing is not available here. Use WhatsApp, SMS or Email.');
+};
+
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function render(){
+  if(!recs.length){$('list').textContent='No records yet.';return}
+  $('list').innerHTML=recs.map(function(r){
+    return '<div class="rec">'+(r.photo?'<img src="'+r.photo+'" alt="Record photo">':'')+
+    '<strong>'+esc(r.local)+'</strong><br><span class="mute">'+r.lat.toFixed(6)+', '+r.lon.toFixed(6)+' (about '+r.acc+' m)</span>'+
+    (r.note?'<br>'+esc(r.note):'')+'<br><button class="alt" data-id="'+r.id+'" style="margin-top:8px;padding:8px 12px">Send again</button></div>';
+  }).join('');
+  Array.prototype.forEach.call($('list').querySelectorAll('button'),function(b){b.onclick=function(){var id=+b.getAttribute('data-id');recs.forEach(function(r){if(r.id===id)show(r)})}});
+}
+$('clr').onclick=function(){if(confirm('Delete all saved records on this phone?')){recs=[];sv('fr_recs',recs);render()}};
+render();
+})();
+</script>
+</body>
+</html>
