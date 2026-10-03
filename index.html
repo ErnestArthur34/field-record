@@ -41,6 +41,8 @@ img.p{width:100%;max-height:260px;object-fit:cover;border-radius:8px;margin-top:
 .rec{border-top:1px solid var(--line);padding:12px 0}.rec:first-child{border-top:0}
 .rec img{width:64px;height:64px;object-fit:cover;border-radius:6px;float:right;margin-left:10px}
 details summary{cursor:pointer;font-weight:600}
+select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+.grp{border-top:1px solid var(--line);padding:8px 0}.grp summary{cursor:pointer}
 </style>
 </head>
 <body>
@@ -91,6 +93,29 @@ details summary{cursor:pointer;font-weight:600}
   <label for="me">Your name</label><input id="me">
   <div class="row" style="margin-top:12px"><button id="ss">Save details</button></div>
 </details>
+
+<section class="card" id="cloud">
+  <h2>Supervisor dashboard &amp; sync</h2>
+  <p class="mute" id="cloudMsg"></p>
+  <div id="cloudIn">
+    <label for="role">I am a</label>
+    <select id="role"><option value="staff">Staff member</option><option value="sup">Supervisor</option></select>
+    <label for="ph">My phone number</label><input id="ph" inputmode="tel" placeholder="0241234567">
+    <div id="rcbox"></div>
+    <div class="row" style="margin-top:10px"><button id="send">Send code</button></div>
+    <div id="codeRow" hidden><label for="code">6-digit code</label><input id="code" inputmode="numeric" autocomplete="one-time-code"><div class="row" style="margin-top:10px"><button id="verify">Verify</button></div></div>
+  </div>
+  <div id="cloudOn" hidden>
+    <strong id="who"></strong>
+    <p class="mute" id="cmsg"></p>
+    <div class="row"><button id="sync" class="alt">Sync now</button><button id="out" class="alt">Sign out</button></div>
+  </div>
+  <div id="dash" hidden>
+    <div class="row" style="margin-top:12px"><div><label for="fd">Date</label><input id="fd" type="date"></div><div><label for="so">Sort by</label><select id="so"><option value="name">Name</option><option value="latest">Latest activity</option><option value="count">Most records</option></select></div></div>
+    <div id="dl" class="mute"></div>
+    <div class="row" style="margin-top:8px"><button id="rf" class="alt">Refresh</button></div>
+  </div>
+</section>
 
 <section class="card">
   <h2>Saved records</h2>
@@ -162,7 +187,7 @@ $('save').onclick=function(){
   recs.unshift(r);
   if(!sv('fr_recs',recs)){r.photo=null;if(!sv('fr_recs',recs)){recs.shift()}}
   $('note').value='';photo=null;$('prev').hidden=true;$('save').disabled=true;
-  render();show(r);
+  render();show(r);if(window.cloudSave)window.cloudSave();
 };
 
 function need(k,t){if(!cfg[k]){$('setup').open=true;$('setup').scrollIntoView();alert('Add your supervisor\'s '+t+' first.');return false}return true}
@@ -188,6 +213,94 @@ function render(){
 }
 $('clr').onclick=function(){if(confirm('Delete all saved records on this phone?')){recs=[];sv('fr_recs',recs);render()}};
 render();
+})();
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+// Paste your Firebase web app settings here
+var FB={apiKey:"AIzaSyCT7QjVO4kIIWT9wfp6V1STFSC4mHfu51w",authDomain:"field-record-cd473.firebaseapp.com",projectId:"field-record-cd473",appId:"1:921087718439:web:a8318e4e436bc1408b4a02"};
+var $=function(i){return document.getElementById(i)};
+function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function st(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function norm(p){var d=String(p||'').replace(/\D/g,'');if(!d)return '';if(d.indexOf('233')===0)return '+'+d;if(d[0]==='0')return '+233'+d.slice(1);return '+'+d}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function msg(t){$('cloudMsg').textContent=t}
+window.cloudSave=function(){};
+if(FB.apiKey.indexOf('YOUR_')===0||typeof firebase==='undefined'){msg('Cloud sync is not set up yet. Records stay on this phone.');$('cloudIn').hidden=true;return}
+firebase.initializeApp(FB);
+var auth=firebase.auth(),db=firebase.firestore(),rc=null,conf=null,role=ld('fr_role','staff'),data=[];
+$('role').value=role;
+$('send').onclick=function(){
+  var ph=norm($('ph').value);if(ph.length<11){msg('Enter a valid phone number.');return}
+  if(!rc)rc=new firebase.auth.RecaptchaVerifier('rcbox',{size:'invisible'});
+  $('send').disabled=true;msg('Sending code...');
+  auth.signInWithPhoneNumber(ph,rc).then(function(c){conf=c;$('codeRow').hidden=false;msg('Code sent to '+ph+'. Enter it below.')})
+  .catch(function(e){msg('Could not send code ('+(e.code||'error')+').');try{rc.clear()}catch(x){}rc=null})
+  .then(function(){$('send').disabled=false});
+};
+$('verify').onclick=function(){if(!conf)return;conf.confirm($('code').value.trim()).catch(function(){msg('Wrong or expired code. Try again.')})};
+$('out').onclick=function(){auth.signOut()};
+$('role').onchange=function(){role=this.value;st('fr_role',role);ui(auth.currentUser)};
+$('sync').onclick=function(){syncAll()};
+$('rf').onclick=function(){loadDash()};
+$('fd').onchange=$('so').onchange=function(){draw()};
+window.addEventListener('online',function(){syncAll()});
+auth.onAuthStateChanged(ui);
+
+function ui(u){
+  $('cloudIn').hidden=!!u;$('cloudOn').hidden=!u;$('dash').hidden=!(u&&role==='sup');
+  if(!u){msg('Sign in with your phone number to sync records or view your team.');return}
+  $('who').textContent=u.phoneNumber+(role==='sup'?' (Supervisor)':' (Staff)');
+  $('sync').hidden=role!=='staff';
+  if(role==='sup'){$('cmsg').textContent='Showing records from staff who named your number as their supervisor.';msg('');loadDash()}
+  else{msg('');syncAll()}
+}
+function syncAll(){
+  var u=auth.currentUser;if(!u||role!=='staff')return;
+  var cfg=ld('fr_cfg',{}),sp=norm(cfg.sp);
+  if(!sp){$('cmsg').textContent='Add your supervisor phone under Supervisor details to sync.';return}
+  var recs=ld('fr_recs',[]),done=ld('fr_sync',[]);
+  var todo=recs.filter(function(r){return done.indexOf(r.id)<0});
+  if(!todo.length){$('cmsg').textContent='All records synced.';return}
+  $('cmsg').textContent='Syncing '+todo.length+' record(s)...';
+  Promise.all(todo.map(function(r){
+    return db.collection('records').doc(u.uid+'_'+r.id).set({uid:u.uid,name:cfg.me||'',phone:u.phoneNumber,supervisorPhone:sp,lat:r.lat,lon:r.lon,acc:r.acc,time:r.time,local:r.local,note:r.note||'',photo:r.photo||null})
+    .then(function(){done.push(r.id)}).catch(function(){});
+  })).then(function(){
+    st('fr_sync',done);
+    var left=todo.filter(function(r){return done.indexOf(r.id)<0}).length;
+    $('cmsg').textContent=left?left+' record(s) waiting. Check your connection and tap Sync now.':'All records synced to your supervisor.';
+  });
+}
+function loadDash(){
+  var u=auth.currentUser;if(!u)return;$('dl').textContent='Loading...';
+  db.collection('records').where('supervisorPhone','==',u.phoneNumber).get().then(function(s){
+    data=s.docs.map(function(d){return d.data()});draw();
+  }).catch(function(e){$('dl').textContent='Could not load records ('+(e.code||'error')+').'});
+}
+function day(t){var d=new Date(t);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+function draw(){
+  var f=$('fd').value,by={};
+  data.forEach(function(r){
+    if(f&&day(r.time)!==f)return;
+    var g=by[r.uid]||(by[r.uid]={name:r.name||r.phone,phone:r.phone,list:[]});g.list.push(r);
+  });
+  var gs=Object.keys(by).map(function(k){var g=by[k];g.list.sort(function(a,b){return a.time<b.time?1:-1});g.last=g.list[0].time;return g});
+  var so=$('so').value;
+  gs.sort(function(a,b){return so==='count'?b.list.length-a.list.length:so==='latest'?(a.last<b.last?1:-1):a.name.localeCompare(b.name)});
+  if(!gs.length){$('dl').textContent=data.length?'No records on that date.':'No records yet.';return}
+  $('dl').innerHTML=gs.map(function(g){
+    return '<details class="grp"><summary><strong>'+esc(g.name)+'</strong> <span class="mute">'+esc(g.phone)+' &middot; '+g.list.length+' record(s)</span></summary>'+
+    g.list.map(function(r){
+      var img=r.photo&&String(r.photo).indexOf('data:image/')===0?'<img src="'+esc(r.photo)+'" alt="Photo">':'';
+      return '<div class="rec">'+img+'<strong>'+esc(r.local)+'</strong><br><span class="mute">'+Number(r.lat).toFixed(6)+', '+Number(r.lon).toFixed(6)+' (about '+Number(r.acc)+' m)</span>'+(r.note?'<br>'+esc(r.note):'')+'<br><a href="https://maps.google.com/?q='+Number(r.lat)+','+Number(r.lon)+'" target="_blank" rel="noopener">Open map</a></div>';
+    }).join('')+'</details>';
+  }).join('');
+}
+window.cloudSave=syncAll;
 })();
 </script>
 </body>
