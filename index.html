@@ -159,14 +159,18 @@ $('gps').onclick=function(){
 
 function pick(f){
   if(!f)return;
-  var r=new FileReader();
-  r.onload=function(){var im=new Image();im.onload=function(){
-    var m=900,s=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');
-    c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
-    c.getContext('2d').drawImage(im,0,0,c.width,c.height);
-    photo=c.toDataURL('image/jpeg',0.7);$('prev').src=photo;$('prev').hidden=false;
-  };im.src=r.result};
-  r.readAsDataURL(f);
+  var W=800;
+  function draw(src,w,h){var k=Math.min(1,W/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);c.getContext('2d').drawImage(src,0,0,c.width,c.height);return c}
+  function done(c){photo=c.toDataURL('image/jpeg',0.6);$('prev').src=photo;$('prev').hidden=false;c.width=1;c.height=1}
+  function fallback(){
+    var u=URL.createObjectURL(f),im=new Image();
+    im.onload=function(){var c=draw(im,im.naturalWidth,im.naturalHeight);URL.revokeObjectURL(u);done(c)};
+    im.onerror=function(){URL.revokeObjectURL(u);alert('Could not load that photo. Close other apps and tabs, then try again.')};
+    im.src=u;
+  }
+  if(window.createImageBitmap){
+    createImageBitmap(f,{resizeWidth:W,resizeQuality:'medium'}).then(function(bm){var c=draw(bm,bm.width,bm.height);if(bm.close)bm.close();done(c)}).catch(fallback);
+  }else fallback();
 }
 $('cam').onchange=function(){pick(this.files[0])};
 $('up').onchange=function(){pick(this.files[0])};
