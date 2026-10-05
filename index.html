@@ -43,9 +43,18 @@ img.p{width:100%;max-height:260px;object-fit:cover;border-radius:8px;margin-top:
 details summary{cursor:pointer;font-weight:600}
 select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
 .grp{border-top:1px solid var(--line);padding:8px 0}.grp summary{cursor:pointer}
+#camBox{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column}
+#camBox[hidden]{display:none}
+#camBox video{flex:1;min-height:0;width:100%;object-fit:contain}
+#camBox .row{padding:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+#camBox .alt{color:#fff;border-color:#555}
 </style>
 </head>
 <body>
+<div id="camBox" hidden>
+  <video id="vid" autoplay playsinline muted></video>
+  <div class="row"><button id="snap" type="button">Capture</button><button id="flip" class="alt" type="button">Flip</button><button id="cx" class="alt" type="button">Cancel</button></div>
+</div>
 <main>
 <h1>Field Record</h1>
 <p class="sub">Capture where you are, when, with a photo, and send it to your supervisor.</p>
@@ -65,7 +74,7 @@ select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px 
   <label for="note">Note (optional)</label>
   <textarea id="note" placeholder="Where you are and what you are doing"></textarea>
   <div class="row" style="margin-top:10px">
-    <label class="btn alt" style="margin:0;color:var(--ink)">Take photo<input id="cam" type="file" accept="image/*" capture="environment" hidden></label>
+    <button id="camBtn" class="alt" type="button">Take photo</button><input id="cam" type="file" accept="image/*" capture="environment" hidden>
     <label class="btn alt" style="margin:0;color:var(--ink)">Upload image<input id="up" type="file" accept="image/*" hidden></label>
   </div>
   <img id="prev" class="p" alt="Photo preview" hidden>
@@ -174,6 +183,25 @@ function pick(f){
 }
 $('cam').onchange=function(){pick(this.files[0])};
 $('up').onchange=function(){pick(this.files[0])};
+var stream=null,facing='environment';
+function stopCam(){if(stream){stream.getTracks().forEach(function(t){t.stop()});stream=null}$('vid').srcObject=null;$('camBox').hidden=true}
+function startCam(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$('cam').click();return}
+  navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:1280},height:{ideal:720}},audio:false}).then(function(s){
+    stream=s;$('vid').srcObject=s;$('camBox').hidden=false;
+    var p=$('vid').play();if(p&&p.catch)p.catch(function(){});
+  }).catch(function(){$('cam').click()});
+}
+$('camBtn').onclick=function(){stopCam();startCam()};
+$('flip').onclick=function(){stopCam();facing=facing==='environment'?'user':'environment';startCam()};
+$('cx').onclick=stopCam;
+$('snap').onclick=function(){
+  var v=$('vid');if(!v.videoWidth)return;
+  var k=Math.min(1,800/Math.max(v.videoWidth,v.videoHeight)),c=document.createElement('canvas');
+  c.width=Math.round(v.videoWidth*k);c.height=Math.round(v.videoHeight*k);
+  c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+  photo=c.toDataURL('image/jpeg',0.6);$('prev').src=photo;$('prev').hidden=false;stopCam();
+};
 
 function msg(r){
   var n=r.note?'\nNote: '+r.note:'';
